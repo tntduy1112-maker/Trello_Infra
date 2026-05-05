@@ -1,0 +1,8 @@
+.env
+.env.local
+nginx/ssl/
+nginx/logs/
+*.log
+.DS_Store
+docker-compose.override.yml
+docker-compose.local.yml

@@ -1,0 +1,205 @@
+# ============================================
+# Trello Agent — Docker Compose (Production)
+# ============================================
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml logs -f
+# ============================================
+
+services:
+  # ==========================================
+  # PostgreSQL 16
+  # ==========================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: trello-agent-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - trello-agent-internal
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ==========================================
+  # Redis 7
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: trello-agent-redis
+    restart: always
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - trello-agent-internal
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # ==========================================
+  # MinIO (S3-compatible storage)
+  # ==========================================
+  minio:
+    image: minio/minio:latest
+    container_name: trello-agent-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - trello-agent-internal
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ==========================================
+  # Go API Server
+  # ==========================================
+  api:
+    image: ${DOCKER_REGISTRY:-ghcr.io}/trello-agent-api:${VERSION:-latest}
+    container_name: trello-agent-api
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      # App
+      APP_NAME: trello-agent
+      APP_ENV: production
+      APP_PORT: 8080
+      APP_URL: ${APP_URL}
+      LOG_LEVEL: info
+
+      # Database
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=disable
+      DB_POOL_MAX: 25
+
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+
+      # JWT (use strong secrets in production!)
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_EXPIRY: 15m
+      JWT_REFRESH_EXPIRY: 168h
+
+      # AES Encryption
+      AES_KEY: ${AES_KEY}
+
+      # MinIO
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_USE_SSL: "false"
+
+      # SMTP
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+
+      # Frontend URL
+      FRONTEND_URL: ${FRONTEND_URL}
+
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    ports:
+      - "8080:8080"
+    networks:
+      - trello-agent-internal
+      - trello-agent-external
+    deploy:
+      mode: replicated
+      replicas: 2
+      resources:
+        limits:
+          memory: 256M
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+
+  # ==========================================
+  # Nginx (Reverse Proxy + SSL)
+  # ==========================================
+  nginx:
+    image: nginx:alpine
+    container_name: trello-agent-nginx
+    restart: always
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    networks:
+      - trello-agent-external
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+# ==========================================
+# Networks
+# ==========================================
+networks:
+  trello-agent-internal:
+    driver: bridge
+    internal: true
+  trello-agent-external:
+    driver: bridge
+
+# ==========================================
+# Volumes
+# ==========================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
