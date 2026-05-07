@@ -146,7 +146,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
       MINIO_BUCKET: ${MINIO_BUCKET:-trello-agent}
       MINIO_USE_SSL: "false"
-      MINIO_PUBLIC_HOST: http://localhost:9000/${MINIO_BUCKET:-trello-agent}
+      MINIO_PUBLIC_HOST: ${MINIO_PUBLIC_HOST:-http://localhost:9000/trello-agent}
 
       # SMTP (development - use MailHog or similar)
       SMTP_HOST: ${SMTP_HOST:-mailhog}
