@@ -181,6 +181,33 @@ services:
     networks:
       - trello-agent-network
 
+  # ==========================================
+  # Frontend (React + Vite)
+  # ==========================================
+  web:
+    image: trello-agent-web:local
+    container_name: trello-agent-web
+    restart: unless-stopped
+    networks:
+      - trello-agent-network
+
+  # ==========================================
+  # Nginx (reverse proxy + frontend)
+  # ==========================================
+  nginx:
+    image: nginx:alpine
+    container_name: trello-agent-nginx
+    restart: unless-stopped
+    depends_on:
+      - api
+      - web
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - trello-agent-network
+
 # ==========================================
 # Networks
 # ==========================================
