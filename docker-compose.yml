@@ -185,6 +185,10 @@ services:
   # Frontend (React + Vite)
   # ==========================================
   web:
+    build:
+      context: ../../Trello_Frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost}
     image: trello-agent-web:local
     container_name: trello-agent-web
     restart: unless-stopped
