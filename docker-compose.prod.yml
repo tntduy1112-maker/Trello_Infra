@@ -19,12 +19,22 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - /opt/trello/data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
     networks:
       - trello-agent-internal
     deploy:
@@ -46,12 +56,16 @@ services:
       --maxmemory-policy allkeys-lru
       --appendonly yes
     volumes:
-      - redis_data:/data
+      - /opt/trello/data/redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     networks:
       - trello-agent-internal
     deploy:
@@ -63,7 +77,7 @@ services:
   # MinIO (S3-compatible storage)
   # ==========================================
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: trello-agent-minio
     restart: always
     command: server /data --console-address ":9001"
@@ -71,7 +85,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
-      - minio_data:/data
+      - /opt/trello/data/minio:/data
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 30s
@@ -143,6 +157,10 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS}
     ports:
       - "8080:8080"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     networks:
       - trello-agent-internal
       - trello-agent-external
@@ -194,12 +212,8 @@ networks:
     driver: bridge
 
 # ==========================================
-# Volumes
+# Host mount paths (create on VPS before first run):
+#   sudo mkdir -p /opt/trello/data/{postgres,redis,minio}
+#   sudo chown -R 999:999 /opt/trello/data/postgres
+#   sudo chown -R 999:999 /opt/trello/data/redis
 # ==========================================
-volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
-  minio_data:
-    driver: local

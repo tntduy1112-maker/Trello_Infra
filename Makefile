@@ -1,12 +1,16 @@
-.PHONY: help dev up down logs logs-api restart migrate migrate-down db-shell redis-cli docker-build docker-push docker-prod clean clean-all
+.PHONY: help dev up prod down health logs logs-api restart migrate migrate-down db-shell redis-cli build-api docker-push clean clean-all
 
 help:
 	@echo "Trello Infra - Available commands:"
 	@echo ""
-	@echo "  Development:"
-	@echo "    make dev          - Start development environment"
-	@echo "    make up           - Start all services in background"
-	@echo "    make down         - Stop all services"
+	@echo "  Environments:"
+	@echo "    make dev          - Start dev stack (docker-compose.yml)"
+	@echo "    make up           - Start dev stack in background"
+	@echo "    make prod         - Start prod stack (docker-compose.prod.yml)"
+	@echo "    make down         - Stop current stack"
+	@echo "    make health       - Check API health endpoint"
+	@echo ""
+	@echo "  Logs:"
 	@echo "    make logs         - View logs (all services)"
 	@echo "    make logs-api     - View API logs only"
 	@echo "    make restart      - Restart all services"
@@ -18,12 +22,8 @@ help:
 	@echo "    make redis-cli    - Open Redis CLI"
 	@echo ""
 	@echo "  Docker:"
-	@echo "    make docker-build IMAGE=<tag> - Build API image from Backend repo"
-	@echo "    make docker-push              - Push to registry"
-	@echo "    make docker-prod              - Start production stack"
-	@echo ""
-	@echo "  NOTE: Build API image first:"
-	@echo "    cd ../Trello_Backend && docker build -t trello-agent-api:local ."
+	@echo "    make build-api    - Build API image from Backend repo"
+	@echo "    make docker-push  - Push image to registry"
 	@echo ""
 
 # ==========================================
@@ -31,13 +31,23 @@ help:
 # ==========================================
 
 dev:
-	docker compose up
+	docker compose -f docker-compose.yml up
 
 up:
-	docker compose up -d
+	docker compose -f docker-compose.yml up -d
 
 down:
 	docker compose down
+
+# ==========================================
+# Production
+# ==========================================
+
+prod:
+	docker compose -f docker-compose.prod.yml up -d
+
+health:
+	@curl -sf http://localhost:8080/health && echo " OK" || echo " FAIL"
 
 logs:
 	docker compose logs -f
@@ -71,16 +81,12 @@ redis-cli:
 VERSION ?= latest
 REGISTRY ?= ghcr.io/your-org
 
-docker-build:
-	@echo "Build image from Trello_Backend repo:"
-	@echo "  cd ../Trello_Backend && docker build -t trello-agent-api:$(VERSION) ."
+build-api:
+	cd ../Trello_Backend && docker build -t trello-agent-api:$(VERSION) .
 
 docker-push:
 	docker tag trello-agent-api:$(VERSION) $(REGISTRY)/trello-agent-api:$(VERSION)
 	docker push $(REGISTRY)/trello-agent-api:$(VERSION)
-
-docker-prod:
-	docker compose -f docker-compose.prod.yml up -d
 
 # ==========================================
 # Cleanup
