@@ -182,7 +182,17 @@ services:
       - trello-agent-network
 
   # ==========================================
-  # Frontend (React + Vite)
+  # Landing (Productcon_Landing SPA)
+  # ==========================================
+  landing:
+    image: trello-agent-landing:local
+    container_name: trello-agent-landing
+    restart: unless-stopped
+    networks:
+      - trello-agent-network
+
+  # ==========================================
+  # Frontend (TaskFlow React SPA)
   # ==========================================
   web:
     build:
@@ -205,6 +215,7 @@ services:
     depends_on:
       - api
       - web
+      - landing
     ports:
       - "80:80"
     volumes:
