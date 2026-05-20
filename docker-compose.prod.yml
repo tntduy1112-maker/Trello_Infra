@@ -165,18 +165,37 @@ services:
       - trello-agent-internal
       - trello-agent-external
     deploy:
-      mode: replicated
-      replicas: 2
       resources:
         limits:
           memory: 256M
-      update_config:
-        parallelism: 1
-        delay: 10s
-        order: start-first
-      rollback_config:
-        parallelism: 1
-        delay: 10s
+
+  # ==========================================
+  # Frontend (TaskFlow React SPA)
+  # ==========================================
+  web:
+    image: trello-agent-web:local
+    container_name: trello-agent-web
+    restart: always
+    networks:
+      - trello-agent-external
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  # ==========================================
+  # Landing (Productcon_Landing SPA)
+  # ==========================================
+  landing:
+    image: trello-agent-landing:local
+    container_name: trello-agent-landing
+    restart: always
+    networks:
+      - trello-agent-external
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   # ==========================================
   # Nginx (Reverse Proxy + SSL)
@@ -187,6 +206,8 @@ services:
     restart: always
     depends_on:
       - api
+      - web
+      - landing
     ports:
       - "80:80"
       - "443:443"
