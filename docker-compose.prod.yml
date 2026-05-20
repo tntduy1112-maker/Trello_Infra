@@ -102,7 +102,7 @@ services:
   # Go API Server
   # ==========================================
   api:
-    image: ${DOCKER_REGISTRY:-ghcr.io}/trello-agent-api:${VERSION:-latest}
+    image: trello-agent-api:local
     container_name: trello-agent-api
     restart: always
     depends_on:
