@@ -219,6 +219,7 @@ services:
       - ./nginx/ssl:/etc/nginx/ssl:ro
       - ./nginx/logs:/var/log/nginx
     networks:
+      - trello-agent-internal
       - trello-agent-external
     deploy:
       resources:
